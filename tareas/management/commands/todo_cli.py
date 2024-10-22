@@ -41,6 +41,7 @@ class Command(BaseCommand):
 ¿Qué quieres hacer?
 ------------------
 1. 📝 Agregar tarea
+2. ❌ Eliminar tarea
             """)
             
             try:
@@ -48,6 +49,8 @@ class Command(BaseCommand):
                 
                 if opcion == "1":
                     self.agregar_tarea()
+                elif opcion == "2":
+                    self.eliminar_tarea()
                 else:
                     self.stdout.write(self.style.WARNING("\n⚠️  Opción inválida. Intenta de nuevo.\n"))
             
@@ -83,4 +86,26 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f"\n✅ Tarea '{tarea.title}' creada con éxito!\n"))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"\n❌ Error al crear la tarea: {str(e)}\n"))
+    def eliminar_tarea(self):
+        """Eliminar una tarea existente"""
+        try:
+            id_tarea = input("\nID de la tarea a eliminar (0 para cancelar): ").strip()
+            
+            if id_tarea == "0":
+                return
+                
+            tarea = Task.objects.get(id=id_tarea)
+            titulo = tarea.title
+            tarea.delete()
+            
+            # sincronizamos con el archivo
+            self.sync_db_to_file()
+            
+            self.stdout.write(self.style.SUCCESS(f"\n✅ Tarea '{titulo}' eliminada con éxito!\n"))
+            
+        except Task.DoesNotExist:
+            self.stdout.write(self.style.ERROR("\n❌ Tarea no encontrada\n"))
+        except ValueError:
+            self.stdout.write(self.style.ERROR("\n❌ ID inválido\n"))
+           
 
