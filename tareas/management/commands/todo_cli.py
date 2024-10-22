@@ -43,6 +43,7 @@ class Command(BaseCommand):
 1. 📝 Agregar tarea
 2. ❌ Eliminar tarea
 3. ✅ Marcar tarea como completada
+4. 📋 Listar tareas
             """)
             
             try:
@@ -54,6 +55,8 @@ class Command(BaseCommand):
                     self.eliminar_tarea()
                 elif opcion == "3":
                     self.completar_tarea()
+                elif opcion == "4":
+                    self.listar_tareas(solo_pendientes=True)
                 else:
                     self.stdout.write(self.style.WARNING("\n⚠️  Opción inválida. Intenta de nuevo.\n"))
             
@@ -91,6 +94,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"\n❌ Error al crear la tarea: {str(e)}\n"))
     def eliminar_tarea(self):
         """Eliminar una tarea existente"""
+        self.listar_tareas(solo_pendientes=True)
         try:
             id_tarea = input("\nID de la tarea a eliminar (0 para cancelar): ").strip()
             
@@ -112,6 +116,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("\n❌ ID inválido\n"))
     def completar_tarea(self):
         """Marcar una tarea como completada"""
+        self.listar_tareas(solo_pendientes=True)
         try:
             id_tarea = input("\nID de la tarea a completar (0 para cancelar): ").strip()
             
@@ -131,5 +136,26 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("\n❌ Tarea no encontrada o ya está completada\n"))
         except ValueError:
             self.stdout.write(self.style.ERROR("\n❌ ID inválido\n"))
+
+    def listar_tareas(self, solo_pendientes=False):
+        """Listar tareas con formato bonito"""
+        queryset = Task.objects.filter(completed=False) if solo_pendientes else Task.objects.all()
+        
+        if not queryset.exists():
+            self.stdout.write("\n📋 No hay tareas" + (" pendientes" if solo_pendientes else "") + "\n")
+            return
+            
+        self.stdout.write("\n📋 LISTA DE TAREAS" + (" PENDIENTES" if solo_pendientes else ""))
+        self.stdout.write("-" * 50)
+        
+        for tarea in queryset:
+            #Usamos simbolos para representar el estado de la tareas con su atributo completed
+            estado = "⭕" if not tarea.completed else "✅"
+            fecha = tarea.created_at.strftime("%d/%m/%Y %H:%M")
+            self.stdout.write(f"[{tarea.id}] {estado} {tarea.title} ({fecha})")
+            if tarea.description:
+                self.stdout.write(f"    └─ {tarea.description}")
+        
+        self.stdout.write("-" * 50)
            
 
