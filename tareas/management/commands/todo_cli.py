@@ -44,6 +44,8 @@ class Command(BaseCommand):
 2. ❌ Eliminar tarea
 3. ✅ Marcar tarea como completada
 4. 📋 Listar tareas
+5. 📊 Ver archivo de tareas
+6. 🚪 Salir
             """)
             
             try:
@@ -57,6 +59,11 @@ class Command(BaseCommand):
                     self.completar_tarea()
                 elif opcion == "4":
                     self.listar_tareas(solo_pendientes=True)
+                elif opcion == "5":
+                    self.ver_archivo_tareas()
+                elif opcion == "6":
+                    self.stdout.write(self.style.SUCCESS("\n¡Chau! Nos vemos 👋\n"))
+                    break
                 else:
                     self.stdout.write(self.style.WARNING("\n⚠️  Opción inválida. Intenta de nuevo.\n"))
             
@@ -157,5 +164,19 @@ class Command(BaseCommand):
                 self.stdout.write(f"    └─ {tarea.description}")
         
         self.stdout.write("-" * 50)
+    def ver_archivo_tareas(self):
+        """Ver el contenido del archivo de tareas"""
+        try:
+            with open(self.file_path, 'r', encoding='utf-8') as f:
+                tareas = json.load(f)
+            
+            self.stdout.write("\n📊 CONTENIDO DEL ARCHIVO DE TAREAS")
+            self.stdout.write("-" * 50)
+            self.stdout.write(json.dumps(tareas, indent=2, ensure_ascii=False))
+            self.stdout.write("-" * 50)
+        except FileNotFoundError:
+            self.stdout.write(self.style.ERROR("\n❌ El archivo de tareas aún no existe\n"))
+        except json.JSONDecodeError:
+            self.stdout.write(self.style.ERROR("\n❌ Error al leer el archivo de tareas\n"))
            
 
