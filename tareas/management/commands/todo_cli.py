@@ -42,6 +42,7 @@ class Command(BaseCommand):
 ------------------
 1. 📝 Agregar tarea
 2. ❌ Eliminar tarea
+3. ✅ Marcar tarea como completada
             """)
             
             try:
@@ -51,6 +52,8 @@ class Command(BaseCommand):
                     self.agregar_tarea()
                 elif opcion == "2":
                     self.eliminar_tarea()
+                elif opcion == "3":
+                    self.completar_tarea()
                 else:
                     self.stdout.write(self.style.WARNING("\n⚠️  Opción inválida. Intenta de nuevo.\n"))
             
@@ -105,6 +108,27 @@ class Command(BaseCommand):
             
         except Task.DoesNotExist:
             self.stdout.write(self.style.ERROR("\n❌ Tarea no encontrada\n"))
+        except ValueError:
+            self.stdout.write(self.style.ERROR("\n❌ ID inválido\n"))
+    def completar_tarea(self):
+        """Marcar una tarea como completada"""
+        try:
+            id_tarea = input("\nID de la tarea a completar (0 para cancelar): ").strip()
+            
+            if id_tarea == "0":
+                return
+                
+            tarea = Task.objects.get(id=id_tarea, completed=False)
+            tarea.completed = True
+            tarea.save()
+            
+            # sincroniza con el archivo
+            self.sync_db_to_file()
+            
+            self.stdout.write(self.style.SUCCESS(f"\n✅ ¡Tarea '{tarea.title}' completada!\n"))
+            
+        except Task.DoesNotExist:
+            self.stdout.write(self.style.ERROR("\n❌ Tarea no encontrada o ya está completada\n"))
         except ValueError:
             self.stdout.write(self.style.ERROR("\n❌ ID inválido\n"))
            
