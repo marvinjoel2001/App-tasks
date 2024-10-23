@@ -3,6 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from .models import Task
 from .serializers import TaskSerializer
+from rest_framework.decorators import action
 
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all()
@@ -21,5 +22,16 @@ class TaskViewSet(viewsets.ModelViewSet):
             tarea = self.get_object()
             tarea.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
+        except Task.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+    @action(detail=True, methods=['put'])
+    def completar(self, request, pk=None):
+        """Endpoint para marcar una tarea como completada"""
+        try:
+            tarea = self.get_object()
+            tarea.completed = True
+            tarea.save()
+            serializer = self.get_serializer(tarea)
+            return Response(serializer.data)
         except Task.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
