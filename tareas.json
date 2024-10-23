@@ -5,5 +5,26 @@
     "description": "fgsd",
     "completed": true,
     "created_at": "2024-10-22 23:39:57"
+  },
+  {
+    "id": 3,
+    "title": "almuerzo",
+    "description": "hacer pollo",
+    "completed": false,
+    "created_at": "2024-10-23 13:07:00"
+  },
+  {
+    "id": 4,
+    "title": "Nueva tarea",
+    "description": "Descripción",
+    "completed": false,
+    "created_at": "2024-10-23 13:07:22"
+  },
+  {
+    "id": 5,
+    "title": "prueba",
+    "description": "prueba",
+    "completed": false,
+    "created_at": "2024-10-23 13:44:47"
   }
 ]

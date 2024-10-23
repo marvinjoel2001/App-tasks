@@ -1,33 +1,35 @@
 from django.core.management.base import BaseCommand
-from django.utils import timezone
-from tareas.models import Task
 import json
-
+from datetime import datetime
+import os
 
 class Command(BaseCommand):
-    help = 'Gestión de tareas con guardado en BD y archivo'
+    help = 'Gestión de tareas con guardado en archivo json'
 
     def __init__(self):
         super().__init__()
         self.file_path = 'tareas.json'  # Archivo donde guardaremos las tareas
-        self.sync_db_to_file()  # Sincronizamos al iniciar
+        # Si no existe el archivo, lo creamos vacío
+        if not os.path.exists(self.file_path):
+            with open(self.file_path, 'w', encoding='utf-8') as f:
+                json.dump([], f)
 
-    def sync_db_to_file(self):
-        """Sincroniza las tareas de la base de datos al archivo"""
-        tareas = list(Task.objects.all().values(
-            'id', 
-            'title', 
-            'description', 
-            'completed', 
-            'created_at'
-        ))
-        
-        # Convertimos el datetime a string para poder guardarlo en JSON
-        for tarea in tareas:
-            tarea['created_at'] = tarea['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-        
+    def _leer_tareas(self):
+        """Lee las tareas del archivo json"""
+        try:
+            with open(self.file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return []
+
+    def _guardar_tareas(self, tareas):
+        """Guarda las tareas en el archivo json"""
         with open(self.file_path, 'w', encoding='utf-8') as f:
             json.dump(tareas, f, indent=2, ensure_ascii=False)
+    
+    def _obtener_siguiente_id(self, tareas):
+        """Calcula el siguiente ID disponible"""
+        return max([tarea['id'] for tarea in tareas], default=0) + 1
 
     def handle(self, *args, **kwargs):
         self.stdout.write(self.style.SUCCESS('''
@@ -86,19 +88,26 @@ class Command(BaseCommand):
         descripcion = input("Descripción (opcional): ").strip()
         
         try:
-            # Aqui Guardamos en la base de datos
-            tarea = Task.objects.create(
-                title=titulo,
-                description=descripcion,
-                created_at=timezone.now()
-            )
+            # Lee las tareas actuales
+            tareas = self._leer_tareas()
             
-            # se sincroniza con el archivo
-            self.sync_db_to_file()
+            # Crea la nueva tarea
+            nueva_tarea = {
+                'id': self._obtener_siguiente_id(tareas),
+                'title': titulo,
+                'description': descripcion,
+                'completed': False,
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
             
-            self.stdout.write(self.style.SUCCESS(f"\n✅ Tarea '{tarea.title}' creada con éxito!\n"))
+            # Agrega y guardamos
+            tareas.append(nueva_tarea)
+            self._guardar_tareas(tareas)
+            
+            self.stdout.write(self.style.SUCCESS(f"\n✅ Tarea '{titulo}' creada con éxito!\n"))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"\n❌ Error al crear la tarea: {str(e)}\n"))
+
     def eliminar_tarea(self):
         """Eliminar una tarea existente"""
         self.listar_tareas(solo_pendientes=True)
@@ -107,20 +116,24 @@ class Command(BaseCommand):
             
             if id_tarea == "0":
                 return
-                
-            tarea = Task.objects.get(id=id_tarea)
-            titulo = tarea.title
-            tarea.delete()
             
-            # sincronizamos con el archivo
-            self.sync_db_to_file()
+            # Carga las tareas y buscamos la que queremos eliminar    
+            tareas = self._leer_tareas()
+            tarea = next((t for t in tareas if t['id'] == int(id_tarea)), None)
             
-            self.stdout.write(self.style.SUCCESS(f"\n✅ Tarea '{titulo}' eliminada con éxito!\n"))
+            if not tarea:
+                self.stdout.write(self.style.ERROR("\n❌ Tarea no encontrada\n"))
+                return
             
-        except Task.DoesNotExist:
-            self.stdout.write(self.style.ERROR("\n❌ Tarea no encontrada\n"))
+            # Filtra la tarea a eliminar
+            tareas = [t for t in tareas if t['id'] != int(id_tarea)]
+            self._guardar_tareas(tareas)
+            
+            self.stdout.write(self.style.SUCCESS(f"\n✅ Tarea '{tarea['title']}' eliminada con éxito!\n"))
+            
         except ValueError:
             self.stdout.write(self.style.ERROR("\n❌ ID inválido\n"))
+
     def completar_tarea(self):
         """Marcar una tarea como completada"""
         self.listar_tareas(solo_pendientes=True)
@@ -129,41 +142,49 @@ class Command(BaseCommand):
             
             if id_tarea == "0":
                 return
-                
-            tarea = Task.objects.get(id=id_tarea, completed=False)
-            tarea.completed = True
-            tarea.save()
             
-            # sincroniza con el archivo
-            self.sync_db_to_file()
+            # Carga y buscamos la tarea a completar    
+            tareas = self._leer_tareas()
+            tarea_completada = False
             
-            self.stdout.write(self.style.SUCCESS(f"\n✅ ¡Tarea '{tarea.title}' completada!\n"))
+            for tarea in tareas:
+                if tarea['id'] == int(id_tarea) and not tarea['completed']:
+                    tarea['completed'] = True
+                    tarea_completada = True
+                    self._guardar_tareas(tareas)
+                    self.stdout.write(self.style.SUCCESS(f"\n✅ ¡Tarea '{tarea['title']}' completada!\n"))
+                    break
             
-        except Task.DoesNotExist:
-            self.stdout.write(self.style.ERROR("\n❌ Tarea no encontrada o ya está completada\n"))
+            if not tarea_completada:
+                self.stdout.write(self.style.ERROR("\n❌ Tarea no encontrada o ya está completada\n"))
+            
         except ValueError:
             self.stdout.write(self.style.ERROR("\n❌ ID inválido\n"))
 
     def listar_tareas(self, solo_pendientes=False):
         """Listar tareas con formato bonito"""
-        queryset = Task.objects.filter(completed=False) if solo_pendientes else Task.objects.all()
+        tareas = self._leer_tareas()
         
-        if not queryset.exists():
+        # Filtras las tareas si solo queremos ver las pendientes
+        if solo_pendientes:
+            tareas = [t for t in tareas if not t['completed']]
+        
+        if not tareas:
             self.stdout.write("\n📋 No hay tareas" + (" pendientes" if solo_pendientes else "") + "\n")
             return
             
         self.stdout.write("\n📋 LISTA DE TAREAS" + (" PENDIENTES" if solo_pendientes else ""))
         self.stdout.write("-" * 50)
         
-        for tarea in queryset:
-            #Usamos simbolos para representar el estado de la tareas con su atributo completed
-            estado = "⭕" if not tarea.completed else "✅"
-            fecha = tarea.created_at.strftime("%d/%m/%Y %H:%M")
-            self.stdout.write(f"[{tarea.id}] {estado} {tarea.title} ({fecha})")
-            if tarea.description:
-                self.stdout.write(f"    └─ {tarea.description}")
+        for tarea in tareas:
+            #Usamos simbolos para representar el estado de las tareas
+            estado = "⭕" if not tarea['completed'] else "✅"
+            self.stdout.write(f"[{tarea['id']}] {estado} {tarea['title']} ({tarea['created_at']})")
+            if tarea['description']:
+                self.stdout.write(f"    └─ {tarea['description']}")
         
         self.stdout.write("-" * 50)
+
     def ver_archivo_tareas(self):
         """Ver el contenido del archivo de tareas"""
         try:
@@ -178,5 +199,3 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("\n❌ El archivo de tareas aún no existe\n"))
         except json.JSONDecodeError:
             self.stdout.write(self.style.ERROR("\n❌ Error al leer el archivo de tareas\n"))
-           
-
