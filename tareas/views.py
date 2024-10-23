@@ -40,3 +40,12 @@ class TaskViewSet(viewsets.ModelViewSet):
         tareas = Task.objects.filter(completed=False)
         serializer = self.get_serializer(tareas, many=True)
         return Response(serializer.data)
+    def retrieve(self, request, pk=None):
+        """Endpoint para obtener detalles de una tarea específica"""
+        try:
+            tarea = self.get_object()
+            serializer = self.get_serializer(tarea)
+            return Response(serializer.data)
+        except Task.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
