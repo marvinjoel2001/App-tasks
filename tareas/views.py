@@ -35,3 +35,8 @@ class TaskViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         except Task.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
+    def list(self, request):
+        """Endpoint para listar todas las tareas pendientes"""
+        tareas = Task.objects.filter(completed=False)
+        serializer = self.get_serializer(tareas, many=True)
+        return Response(serializer.data)
